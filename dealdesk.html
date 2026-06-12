@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DealDesk</title>
+<style>
+  :root{
+    --bg:#f6f7f5;
+    --surface:#ffffff;
+    --ink:#1d2b26;
+    --ink-soft:#5a6b64;
+    --line:#dde3df;
+    --accent:#0e6e5c;
+    --accent-soft:#e3efeb;
+    --warn:#9a5b00;
+    --warn-bg:#fdf3e2;
+    --reject:#a3322a;
+    --reject-bg:#fbe9e7;
+    --ok-bg:#e7f3ee;
+    --mono:'SF Mono',ui-monospace,'Cascadia Code',Consolas,monospace;
+    --sans:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45}
+  .wrap{max-width:980px;margin:0 auto;padding:28px 20px 80px}
+
+  header.app{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;border-bottom:2px solid var(--ink);padding-bottom:12px}
+  header.app h1{font-size:17px;font-weight:700;letter-spacing:.02em}
+  header.app h1 span{color:var(--accent)}
+  header.app .sub{font-size:12px;color:var(--ink-soft)}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px;margin-bottom:16px}
+  .panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);margin-bottom:10px}
+
+  textarea{width:100%;border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-family:var(--sans);font-size:13px;resize:vertical;background:#fcfdfc;color:var(--ink)}
+  textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  #articleInput{min-height:150px}
+  #contextInput{min-height:70px}
+
+  .ctx-toggle{font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;padding:6px 0;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+  .ctx-toggle::before{content:'▸';transition:transform .15s}
+  .ctx-toggle.open::before{transform:rotate(90deg)}
+  .ctx-body{display:none;margin-top:8px}
+  .ctx-body.open{display:block}
+  .hint{font-size:11.5px;color:var(--ink-soft);margin-top:6px}
+
+  .runbar{display:flex;gap:10px;align-items:center;margin-top:14px}
+  button.run{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:10px 26px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+  button.run:hover{background:#0a5a4b}
+  button.run:disabled{background:#9bb5ae;cursor:wait}
+  .status{font-size:12.5px;color:var(--ink-soft)}
+  .status.err{color:var(--reject);font-weight:600}
+
+  /* qualification banner */
+  .qual{border-radius:8px;padding:14px 18px;margin-bottom:16px;font-weight:600;font-size:14px;display:none}
+  .qual.show{display:block}
+  .qual.ok{background:var(--ok-bg);border:1px solid #b7d9cc;color:#0c5a4a}
+  .qual.bad{background:var(--reject-bg);border:1px solid #e3b8b3;color:var(--reject)}
+  .qual .reasons{font-weight:400;font-size:13px;margin-top:6px}
+
+  /* field rows */
+  .frow{display:grid;grid-template-columns:190px 1fr 58px;gap:10px;align-items:start;padding:7px 0;border-bottom:1px solid #eef1ef}
+  .frow:last-child{border-bottom:none}
+  .frow .lbl{font-size:12px;color:var(--ink-soft);padding-top:3px}
+  .frow .lbl .req{color:var(--reject)}
+  .frow .val{font-family:var(--mono);font-size:13px;word-break:break-word;white-space:pre-wrap}
+  .frow .val.empty{color:#a8b3ae;font-family:var(--sans);font-style:italic}
+  .frow .val .src{display:inline-block;font-family:var(--sans);font-style:normal;font-size:10px;background:var(--accent-soft);color:var(--accent);border-radius:3px;padding:1px 6px;margin-left:8px;vertical-align:middle}
+  .frow .val .src.verify{background:var(--warn-bg);color:var(--warn)}
+  button.cp{background:#fff;border:1px solid var(--line);border-radius:5px;font-size:11px;padding:3px 0;width:54px;cursor:pointer;color:var(--ink-soft);font-family:var(--sans)}
+  button.cp:hover{border-color:var(--accent);color:var(--accent)}
+  button.cp.done{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  /* cards */
+  .card{border:1px solid var(--line);border-radius:7px;margin-bottom:8px;overflow:hidden}
+  .card-head{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;background:#fafbfa;user-select:none}
+  .card-head:hover{background:#f2f5f3}
+  .card-head .caret{font-size:11px;color:var(--ink-soft);transition:transform .15s;width:10px}
+  .card.open .card-head .caret{transform:rotate(90deg)}
+  .card-head .nm{font-weight:600;font-size:13.5px}
+  .card-head .tag{font-size:10.5px;background:var(--accent-soft);color:var(--accent);border-radius:3px;padding:2px 7px;font-weight:600}
+  .card-head .tag.spc{background:#e8e4f3;color:#4a3d7a}
+  .card-head .rep{font-size:11.5px;color:var(--ink-soft);margin-left:auto}
+  .card-body{display:none;padding:6px 14px 12px;border-top:1px solid var(--line)}
+  .card.open .card-body{display:block}
+
+  .side-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-soft);margin:14px 0 8px}
+  .side-label:first-child{margin-top:0}
+
+  .note-block{background:var(--warn-bg);border:1px solid #ecd7b2;border-radius:6px;padding:10px 14px;font-size:12.5px;color:var(--warn);margin-bottom:8px}
+  .flag-item{display:flex;gap:8px;padding:6px 0;font-size:13px;border-bottom:1px solid #eef1ef}
+  .flag-item:last-child{border-bottom:none}
+  .flag-item::before{content:'⚑';color:var(--warn)}
+
+  .sec-source{padding:8px 0;border-bottom:1px solid #eef1ef;font-size:13px}
+  .sec-source:last-child{border-bottom:none}
+  .sec-source a{color:var(--accent);font-weight:600;text-decoration:none;word-break:break-all}
+  .sec-source a:hover{text-decoration:underline}
+  .sec-source .ssum{color:var(--ink-soft);font-size:12.5px;margin-top:3px}
+
+  #results{display:none}
+  #results.show{display:block}
+  .empty-note{font-size:12.5px;color:var(--ink-soft);font-style:italic;padding:4px 0}
+
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--accent-soft);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media(max-width:640px){.frow{grid-template-columns:1fr;gap:3px}.frow button.cp{justify-self:start}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="app">
+    <h1>Deal<span>Desk</span></h1>
+    <div class="sub">deal entry assistant</div>
+  </header>
+
+  <!-- INPUT -->
+  <div class="panel">
+    <h2>Source</h2>
+    <textarea id="articleInput" placeholder="Paste the full press release text here, or paste a URL on its own line."></textarea>
+    <button class="ctx-toggle" id="ctxToggle" type="button">Prior context (optional)</button>
+    <div class="ctx-body" id="ctxBody">
+      <textarea id="contextInput" placeholder="Anything verified from the database that affects this entry. Ex: 'Target was acquired by XYZ Partners in 2022' or 'Sponsor's prior add-ons used PE Firm A with John Smith as professional.'"></textarea>
+      <div class="hint">Treated as verified fact and applied to the entry.</div>
+    </div>
+    <div class="runbar">
+      <button class="run" id="runBtn" type="button">Process Deal</button>
+      <span class="status" id="statusMsg"></span>
+    </div>
+  </div>
+
+  <!-- OUTPUT -->
+  <div class="qual" id="qualBanner"></div>
+
+  <div id="results">
+    <div class="panel"><h2>Target Company Profile</h2><div id="targetOut"></div></div>
+    <div class="panel"><h2>Deal Fields</h2><div id="dealOut"></div></div>
+    <div class="panel"><h2>Participants</h2><div id="partsOut"></div></div>
+    <div class="panel"><h2>Professionals</h2><div id="profsOut"></div></div>
+    <div class="panel" id="fundsPanel"><h2>Deal Funds</h2><div id="fundsOut"></div></div>
+    <div class="panel"><h2>Financials</h2><div id="finOut"></div></div>
+    <div class="panel"><h2>Deal Description</h2><div id="descOut"></div></div>
+    <div class="panel" id="secPanel"><h2>Secondary Sources Found</h2><div id="secOut"></div></div>
+    <div class="panel"><h2>Flags — Verify Against Database</h2><div id="flagsOut"></div></div>
+  </div>
+
+</div>
+
+<script>
+/* ================================================================
+   CONFIG — paste your Gemini API key between the quotes below.
+   Get one free at https://aistudio.google.com  ->  "Get API key"
+   ================================================================ */
+const GEMINI_API_KEY = "AQ.Ab8RN6JSA0hupn7oFqc9K69q56olSpW9u6CRruOr-jmMcvOIaQ";
+const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]; // tried in order
+
+/* ================================================================
+   SYSTEM PROMPT  (full ruleset)
+   ================================================================ */
+const SYSTEM_PROMPT = `
+You are an expert M&A database entry agent. The user provides a press release (text or URL) about an M&A transaction, and optionally a "prior context" note containing verified information from their internal database. Extract, derive, and format all required database fields according to the exact rules below.
+
+You must follow these rules exactly. They reflect strict internal database conventions. When a rule conflicts with your intuition, follow the rule. Never fabricate — if something cannot be determined confidently, leave it blank and mark it "Needs verification."
+
+STEP 1: PRE-QUALIFICATION
+REJECT the deal (status REJECTED, list reasons, populate nothing else) if ANY apply:
+1. Target headquartered outside the US or Canada.
+2. Venture round earlier than Series C (Series C and later ARE entered).
+3. Real-estate-only deal.
+4. Article EXPLICITLY states transaction value below $5 million (if no value stated, do NOT reject on this basis).
+5. Target is project-stage or non-operating.
+6. Not an M&A deal — partnership with no equity, acquihire, licensing, joint venture.
+7. Straight debt deal with no equity component (no equity stake changing hands).
+
+STEP 2: IDENTIFY THE TARGET
+The target is the company being acquired or invested in. Reverse merger rule: the target is the company that will hold LESS stake in the combined entity post-close.
+
+STEP 3: TARGET COMPANY PROFILE
+Source from press release first. For location and website use web search — LinkedIn company page preferred, then company website. Label source of every externally sourced field. Only populate Country/State/City if explicitly and clearly stated on the source page — never infer from area codes, office addresses, or partial signals. If unclear, mark "Needs verification" and include the URL checked.
+Fields (M = mandatory):
+- Primary Name (M): full legal name including suffix. NEVER use commas in company names anywhere ("Company A, Inc." -> "Company A Inc.").
+- Company Name (AKA): only if known by another name.
+- Company Name (DBA): only if does business under different name than legal name.
+- Company Name (FKA): former name if applicable.
+- Company Name (NKA): new name if company is being renamed as part of/around the deal, usually stated in article.
+- Founding Year.
+- Country (M), State (M), City (M).
+- Type (M): always "Corporate" for the target.
+- Website: format strictly www.XXXXX.com — strip https://, strip anything after .com. Always attempt a web search with company name + state before marking Needs verification; it is almost always findable.
+- Governance (M): default "Private"; "Public" only if publicly traded.
+- Company Description: must begin with Provides, Operates, Produces, Distributes, or Retails; concise; no adjectives/marketing language/buzzwords; must NOT mention company name; no period at end; grammatically complete with articles; reads as natural sentence fragment. Geography may be included if meaningful but is not required.
+- Taxonomy Primary (M): exactly ONE of Business Services, Consumer, Energy & Natural Resources, Financial Services, Healthcare, Industrials, Media & Telecom, Technology, Utilities. Fintech -> Financial Services unless essentially a software company -> Technology. Healthcare IT -> typically Technology. If core product is software/tech infrastructure -> Technology; if tech is merely delivery mechanism for a non-tech service -> the underlying sector.
+- Taxonomy Secondary: rare (<10%), must be a DIFFERENT Level 1, only if genuinely needed.
+- Business Focus (M): multi-select from Distributor/Wholesaler (distributes/wholesales/supplies goods), Infrastructure (physical energy/utility assets — not merely owning a building), Production (produces/manufactures goods), Provider/Operator (most common; operators or when nothing else fits), Service (in-person/hands-on services: construction, consulting, etc.), Retailer (direct to consumer incl. restaurants), Rental (NEVER standalone; always pair with Provider/Operator), Online Only (NEVER standalone; only with Retailer), Real Estate (NEVER use). Lean toward double-tagging.
+- Exchange, Ticker: only if Governance = Public.
+
+STEP 4: DEAL FIELDS
+- Announced Date (M): from article. Never later than Closed. If deal already closed, Announced = Closed date.
+- Closed Date: can be future. If not closed and no estimate given, leave blank. Timeframe conversion: Q1->3/31, Q2->6/30, Q3->9/30, Q4->12/31; H1->6/30, H2->12/31; "early [yr]"->3/31, "mid [yr]"->6/30, "late [yr]"->12/31; "by end of [yr]"->12/31; "in the coming weeks"->2 weeks after article date; "by end of the month"->last day of the article's month.
+- Deal Status (M): "Completed" if closed; "Announced" if close is future or blank.
+- Deal Type (M):
+  Buyout — buyer acquiring majority/whole company; language like "acquires," "merged."
+  Add-on — buyer has a backer; nearly always PE-backed platform; also when a corporate subsidiary is the buyer (subsidiary = Sponsor Portfolio Company, parent = backer). Differentiator is whether buyer has a backer, not deal size.
+  Financing — minority stake (<50%); language like "growth investment," "strategic investment," "minority investment."
+  Recap — only if article explicitly says "recapitalization"/"recap."
+  If stake size unstated, infer from language: acquisition/merger language -> Buyout or Add-on; investment/growth language -> Financing.
+- Deal Attitude (M): "Friendly" unless explicitly hostile.
+- Distressed (M): "No" unless Chapter 11/7 bankruptcy forcing the sale -> "Yes."
+- Seller Type (M):
+  Private Company — target not backed by anyone, selling entire business.
+  Private Company (Divestiture) — seller not PE-backed (independent private OR corporate-backed entity) selling part/subsidiary.
+  Private Equity — ANY sale by PE firm or majority PE-backed company incl. divestitures; also PE-backed public company NOT going private.
+  Private Equity (Public to Private) — PE-backed, publicly traded, AND going private.
+  Public Company (Divestiture) — public co selling part/subsidiary.
+  Public Company (Public to Private) — public co (not PE-backed) sold entirely and taken private.
+  Public Company (Public Acquiror) — public co sold entirely to another public co and absorbed.
+  Public Company — rare; public co sold entirely, continues as its own public entity.
+  PE ownership presumption: if a PE firm issues/is prominent in a release about selling a company, assume majority seller UNLESS language indicates minority (seeded the company, participated in venture rounds, etc.).
+- Portfolio Status (M): "None Selected" always for Add-Ons, and for Buyout/Financing/Recap with NO main PE buyer (Other Private Equity does not count). "Active" for Buyout/Financing/Recap with a main PE buyer. "Unknown" for Buyout/Financing/Recap with unknown target.
+- Deal Category (M): default "M&A Deal"; "Bankruptcy M&A" only for clear bankruptcy sale; "SPAC" for SPAC deals; never "Auction."
+
+STEP 5: PARTICIPANTS
+Buy side and sell side (target pre-populated on sell side). Association types:
+Corporate (either; non-PE buyer/seller). Private Equity (either; selling target, or buying/majority-backing buyer). Sponsor Portfolio Company (either; see rules). Other Corporate (BUY ONLY; minority non-PE shareholder/buyer). Other Private Equity (BUY ONLY; minority PE shareholder/buyer). Intermediary (either; banks/financial advisors). Accounting Firms (either). Fairness Opinion Providers (either). Outside Counsel (either; law firm). Special Counsel (either; law firm representing the intermediary). Finance Counsel (either; law firm for financing). Senior Lender (BUY ONLY; default for unspecified lenders financing this acquisition directly; exclude lenders not explicitly tied to this transaction). Mezz Lender (BUY ONLY; must be specified). Second Lien Lender (BUY ONLY; must be explicit, almost never occurs).
+Sponsor Portfolio Company rules:
+- Every Add-On MUST have an SPC on the buy side.
+- The SPC represents ITSELF. The backing PE firm(s) are separate buy-side participants who represent THE SPC (never the reverse), even if the article doesn't say so.
+- SPC appears on SELL side only when a PE-backed company divests part/subsidiary.
+- On Add-Ons, the PE firm and its professionals should be carried over from prior deals with the same sponsor — flag for database verification.
+Representing rules:
+- Take article language literally: "X advised Y" means X represents Y. Advisors/counsel represent whoever is specifically mentioned.
+- Intermediaries almost always at least state the side; if exact company unstated but side stated, assign to that side.
+Multiple PE firms on buy side:
+- If NO explicit lead/participant language, ALL are main Private Equity. Do NOT infer hierarchy from prominence, who issued the release, or who is quoted — invalid signals.
+- Only use Other Private Equity with explicit language: "led by X with participation from Y," "co-investor," etc.
+Company Type mapping for new participant records: Accounting Firms->Accounting Firm; Intermediary->Intermediary; Fairness Opinion Providers->Fairness Opinion Provider; Outside/Special/Finance Counsel->Law Firm; Senior/Mezz/Second Lien Lender->Lender; Private Equity/Other Private Equity->Private Equity; Corporate/Other Corporate/Sponsor Portfolio Company->Corporate.
+Treat ALL participants as not in the database — fully populate a company profile card for each (same field rules as Step 3, with the Type mapping above). No commas in any company names.
+
+STEP 6: PROFESSIONALS
+Track ONLY for: Private Equity (BUY SIDE ONLY — never sell-side PE), Other Private Equity (buy only), Intermediary, Accounting Firms, Fairness Opinion Providers, Outside/Special/Finance Counsel (both sides), Senior/Mezz/Second Lien Lender (buy only). NEVER for Corporate, Other Corporate, or Sponsor Portfolio Company.
+Add a professional ONLY if: (1) directly named as working on the deal, (2) quoted in the release, or (3) named as joining the board.
+Lawyer rule: for counsel firms, ONLY Partner or Of Counsel level. Never Associates/Clerks or below Partner.
+Advisor professionals are rarely named unless the advisor firm issued the release — never invent names.
+Fields (M = mandatory): First Name (M), Middle Name, Last Name (M), Nick Name, Suffix, Prefix, Degrees (titles only e.g. BA MS MBA JD, comma-separated, from LinkedIn/company bio), Company (M), Job Title, Title Category (Analyst, Associate, CEO, Chairman, Of Counsel [lawyers titled Counsel/Of Counsel only], Director, Managing Director, Other, Partner, President, Principal, Vice President), Website (www.XXXXX.com format), Business Phone, Ext., Mobile, Email, LinkedIn URL (trimmed: no https, nothing after profile path), Street, Country (M), State (M), City (M), Post Code, Bio (priority: company website bio; else constructed from LinkedIn experience/education; else "FIRST NAME is a JOB TITLE at COMPANY"). If quoted with no determinable title, still add; leave title fields blank and use bio fallback.
+
+STEP 7: DEAL FUNDS
+Only when buy side includes PE, Other PE, or a lender type. If the article explicitly names the fund, flag it next to the firm. Otherwise note "No fund mentioned — verify via fund database."
+
+STEP 8: FINANCIALS
+- Range (M), in $M: 10-49, 50-249, 250-499, 500-749, 750-999, 1000-1999, 2000-4999, 5000+. No financials mentioned -> default 10-49. Direct value -> corresponding range. Only EBITDA -> EBITDA x10 for range. Only Revenue -> Revenue x1. Both -> EBITDA priority.
+- Trans Value: overall stated value if disclosed.
+- Enter Val: overall acquisition value for ANY majority acquisition — Buyouts AND Add-Ons. NOT for Financing.
+- Target EBITDA / Target Revenue: only if explicitly provided.
+- EV/EBITDA: if stated or calculable.
+- Financial Terms (M): if no financial detail -> exactly "The financial terms of the transaction were not disclosed." If structural detail exists (price per share, earn-outs, etc.) -> copy relevant text VERBATIM from the article. Not for restating value/revenue/EBITDA.
+
+STEP 9: DEAL DESCRIPTION
+Templates:
+Buyout no seller: "[BUYER] has acquired [TARGET] for an undisclosed sum."
+Buyout divestiture: "[BUYER] has acquired [TARGET] from [SELLER] for an undisclosed sum."
+Add-on no seller: "[PE FIRM]-backed [SPONSOR] has acquired [TARGET] for an undisclosed sum."
+Add-on divestiture: "[PE FIRM]-backed [SPONSOR] has acquired [TARGET] from [SELLER] for an undisclosed sum."
+Financing: "[BUYER] has made an investment in [TARGET] for an undisclosed sum."
+Modifiers: replace "an undisclosed sum" with disclosed value; if not closed, "has acquired"->"has agreed to acquire" / "has made"->"has agreed to make"; multiple PE/corporate investors -> list all.
+
+OUTSIDE SOURCING
+Only company location/website, professional details, and secondary deal coverage may use sources outside the release. For every deal run the secondary search: "[TARGET]" "[BUYER]" advise — prioritize PR Newswire, BusinessWire, Globe Newswire, Accesswire, PRWeb releases on the same deal, which often carry extra advisor detail. Label every externally sourced field with its source. Never guess; "Needs verification" beats a wrong answer.
+
+PRIOR CONTEXT
+Treat user-provided prior context as verified fact and apply it (e.g., PE firm becomes seller on the new deal).
+
+OUTPUT FORMAT — CRITICAL
+Respond with ONLY a single valid JSON object. No markdown fences, no commentary before or after. Use null for unavailable optional values, "Needs verification" strings where verification is required. Schema:
+{
+ "qualification": {"status":"QUALIFIED"|"REJECTED","reasons":["..."]},
+ "target": {"primaryName":"","aka":null,"dba":null,"fka":null,"nka":null,"foundingYear":null,"country":"","state":"","city":"","locationSource":"Press Release"|"LinkedIn: <url>"|"Web: <url>"|"Needs verification: <url checked>","type":"Corporate","website":null,"websiteSource":null,"governance":"Private"|"Public","description":null,"taxonomyPrimary":"","taxonomySecondary":null,"businessFocus":["..."],"exchange":null,"ticker":null},
+ "deal": {"announcedDate":"MM/DD/YYYY","closedDate":null,"closedDateNote":null,"dealStatus":"","dealType":"","dealAttitude":"Friendly","distressed":"No","sellerType":"","portfolioStatus":"","dealCategory":"M&A Deal"},
+ "participants": [{"side":"Buy"|"Sell","assocType":"","companyName":"","represents":"","profile":{"primaryName":"","aka":null,"dba":null,"fka":null,"nka":null,"foundingYear":null,"country":null,"state":null,"city":null,"locationSource":null,"type":"","website":null,"websiteSource":null,"governance":"Private","description":null,"taxonomyPrimary":null,"taxonomySecondary":null,"businessFocus":null,"exchange":null,"ticker":null},"notes":null}],
+ "professionals": [{"firmName":"","side":"Buy"|"Sell","firstName":"","middleName":null,"lastName":"","nickName":null,"suffix":null,"prefix":null,"degrees":null,"company":"","jobTitle":null,"titleCategory":null,"website":null,"businessPhone":null,"ext":null,"mobile":null,"email":null,"linkedinUrl":null,"street":null,"country":null,"state":null,"city":null,"postCode":null,"bio":null,"trigger":"quoted"|"named"|"board"}],
+ "dealFunds": [{"firm":"","fundName":null,"note":""}],
+ "financials": {"range":"","transValue":null,"enterVal":null,"targetEBITDA":null,"targetRevenue":null,"evEbitda":null,"financialTerms":""},
+ "dealDescription":"",
+ "secondarySources": [{"title":"","url":"","summary":""}],
+ "flags": ["..."]
+}
+The target itself does NOT appear in the participants array. If REJECTED, return qualification only, with all other top-level keys null.
+`.trim();
+
+/* ================================================================
+   APP LOGIC
+   ================================================================ */
+const $ = id => document.getElementById(id);
+
+$('ctxToggle').addEventListener('click', () => {
+  $('ctxToggle').classList.toggle('open');
+  $('ctxBody').classList.toggle('open');
+});
+
+$('runBtn').addEventListener('click', processdeal);
+
+function setStatus(msg, err=false, spin=false){
+  $('statusMsg').className = 'status' + (err ? ' err' : '');
+  $('statusMsg').innerHTML = (spin ? '<span class="spin"></span>' : '') + msg;
+}
+
+async function processdeal(){
+  const article = $('articleInput').value.trim();
+  if(!article){ setStatus('Paste a press release or URL first.', true); return; }
+  if(!GEMINI_API_KEY || GEMINI_API_KEY.startsWith('PASTE_')){
+    setStatus('No API key set. Open this file and paste your Gemini key into GEMINI_API_KEY at the top of the script.', true); return;
+  }
+
+  $('runBtn').disabled = true;
+  $('results').classList.remove('show');
+  $('qualBanner').className = 'qual';
+  setStatus('Processing — extracting, searching, applying rules…', false, true);
+
+  const ctx = $('contextInput').value.trim();
+  const isUrl = /^https?:\/\/\S+$/i.test(article);
+  const userMsg =
+    (isUrl ? `Press release URL (fetch and read it): ${article}` : `Press release text:\n\n${article}`) +
+    (ctx ? `\n\nPRIOR CONTEXT (verified, apply it):\n${ctx}` : '') +
+    `\n\nToday's date: ${new Date().toLocaleDateString('en-US')}`;
+
+  let lastErr = null;
+  for(const model of MODELS){
+    try{
+      const data = await callGemini(model, userMsg, isUrl);
+      render(data);
+      setStatus('Done.');
+      $('runBtn').disabled = false;
+      return;
+    }catch(e){ lastErr = e; }
+  }
+  setStatus('Error: ' + (lastErr?.message || lastErr), true);
+  $('runBtn').disabled = false;
+}
+
+async function callGemini(model, userMsg, includeUrlTool){
+  const tools = [{google_search:{}}];
+  if(includeUrlTool) tools.push({url_context:{}});
+
+  const body = {
+    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents: [{ role:'user', parts:[{ text: userMsg }] }],
+    tools,
+    generationConfig: { temperature: 0.15, maxOutputTokens: 16384 }
+  };
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+    { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }
+  );
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error(`${model} HTTP ${res.status}: ${t.slice(0,200)}`);
+  }
+  const json = await res.json();
+  const text = (json.candidates?.[0]?.content?.parts || [])
+    .map(p => p.text || '').join('');
+  if(!text) throw new Error(`${model}: empty response`);
+  return parseJSON(text);
+}
+
+function parseJSON(text){
+  let t = text.replace(/```json|```/g,'').trim();
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if(a === -1 || b === -1) throw new Error('No JSON found in model response');
+  return JSON.parse(t.slice(a, b+1));
+}
+
+/* ---------------- rendering ---------------- */
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function copyBtn(value){
+  const b = document.createElement('button');
+  b.className = 'cp'; b.textContent = 'Copy';
+  b.onclick = () => navigator.clipboard.writeText(value ?? '').then(()=>{
+    b.textContent='✓'; b.classList.add('done');
+    setTimeout(()=>{ b.textContent='Copy'; b.classList.remove('done'); }, 1200);
+  });
+  return b;
+}
+
+function fieldRow(label, value, {required=false, source=null} = {}){
+  const row = document.createElement('div'); row.className='frow';
+  const lbl = document.createElement('div'); lbl.className='lbl';
+  lbl.innerHTML = esc(label) + (required ? ' <span class="req">*</span>' : '');
+  const val = document.createElement('div');
+  const empty = value === null || value === undefined || value === '';
+  if(empty){ val.className='val empty'; val.textContent='—'; }
+  else{
+    val.className='val'; val.textContent = String(value);
+    if(source){
+      const s = document.createElement('span');
+      const needsV = /needs verification/i.test(String(source)) || /needs verification/i.test(String(value));
+      s.className = 'src' + (needsV ? ' verify' : '');
+      s.textContent = source; val.appendChild(s);
+    } else if(/needs verification/i.test(String(value))){
+      val.querySelectorAll('.src').forEach(x=>x.remove());
+      const s=document.createElement('span'); s.className='src verify'; s.textContent='verify'; val.appendChild(s);
+    }
+  }
+  row.append(lbl, val, empty ? document.createElement('span') : copyBtn(String(value)));
+  return row;
+}
+
+function companyProfileRows(p, container){
+  container.appendChild(fieldRow('Primary Name', p.primaryName, {required:true}));
+  container.appendChild(fieldRow('Company Name (AKA)', p.aka));
+  container.appendChild(fieldRow('Company Name (DBA)', p.dba));
+  container.appendChild(fieldRow('Company Name (FKA)', p.fka));
+  container.appendChild(fieldRow('Company Name (NKA)', p.nka));
+  container.appendChild(fieldRow('Founding Year', p.foundingYear));
+  container.appendChild(fieldRow('Country', p.country, {required:true, source:p.locationSource}));
+  container.appendChild(fieldRow('State', p.state, {required:true}));
+  container.appendChild(fieldRow('City', p.city, {required:true}));
+  container.appendChild(fieldRow('Type', p.type, {required:true}));
+  container.appendChild(fieldRow('Website', p.website, {source:p.websiteSource}));
+  container.appendChild(fieldRow('Governance', p.governance, {required:true}));
+  container.appendChild(fieldRow('Company Description', p.description));
+  container.appendChild(fieldRow('Taxonomy Primary', p.taxonomyPrimary, {required:true}));
+  container.appendChild(fieldRow('Taxonomy Secondary', p.taxonomySecondary));
+  container.appendChild(fieldRow('Business Focus', Array.isArray(p.businessFocus)? p.businessFocus.join(', ') : p.businessFocus, {required:true}));
+  if(p.governance === 'Public'){
+    container.appendChild(fieldRow('Exchange', p.exchange));
+    container.appendChild(fieldRow('Ticker', p.ticker));
+  }
+}
+
+function makeCard(title, tag, repText, bodyBuilder, spc=false){
+  const card = document.createElement('div'); card.className='card';
+  const head = document.createElement('div'); head.className='card-head';
+  head.innerHTML = `<span class="caret">▸</span><span class="nm">${esc(title)}</span>` +
+                   `<span class="tag${spc?' spc':''}">${esc(tag)}</span>` +
+                   (repText ? `<span class="rep">represents ${esc(repText)}</span>` : '');
+  const body = document.createElement('div'); body.className='card-body';
+  bodyBuilder(body);
+  head.onclick = () => card.classList.toggle('open');
+  card.append(head, body);
+  return card;
+}
+
+function render(d){
+  const q = d.qualification || {};
+  const banner = $('qualBanner');
+  if(q.status === 'REJECTED'){
+    banner.className = 'qual bad show';
+    banner.innerHTML = 'DEAL REJECTED' +
+      `<div class="reasons">${(q.reasons||[]).map(esc).join('<br>')}</div>`;
+    $('results').classList.remove('show');
+    return;
+  }
+  banner.className = 'qual ok show';
+  banner.innerHTML = 'DEAL QUALIFIED' + ((q.reasons&&q.reasons.length)?`<div class="reasons">${q.reasons.map(esc).join('<br>')}</div>`:'');
+
+  // target
+  const t = $('targetOut'); t.innerHTML='';
+  if(d.target) companyProfileRows(d.target, t);
+
+  // deal fields
+  const dl = $('dealOut'); dl.innerHTML='';
+  const de = d.deal || {};
+  dl.appendChild(fieldRow('Announced Date', de.announcedDate, {required:true}));
+  dl.appendChild(fieldRow('Closed Date', de.closedDate, {source: de.closedDateNote||null}));
+  dl.appendChild(fieldRow('Deal Status', de.dealStatus, {required:true}));
+  dl.appendChild(fieldRow('Deal Type', de.dealType, {required:true}));
+  dl.appendChild(fieldRow('Deal Attitude', de.dealAttitude, {required:true}));
+  dl.appendChild(fieldRow('Distressed', de.distressed, {required:true}));
+  dl.appendChild(fieldRow('Seller Type', de.sellerType, {required:true}));
+  dl.appendChild(fieldRow('Portfolio Status', de.portfolioStatus, {required:true}));
+  dl.appendChild(fieldRow('Deal Category', de.dealCategory, {required:true}));
+
+  // participants
+  const po = $('partsOut'); po.innerHTML='';
+  const parts = d.participants || [];
+  for(const side of ['Buy','Sell']){
+    const subset = parts.filter(p => (p.side||'').toLowerCase().startsWith(side.toLowerCase()));
+    const lab = document.createElement('div'); lab.className='side-label';
+    lab.textContent = side === 'Buy' ? 'Buy Side' : 'Sell Side';
+    po.appendChild(lab);
+    if(side==='Sell'){
+      const tgt = document.createElement('div'); tgt.className='empty-note';
+      tgt.textContent = `Target Company — ${d.target?.primaryName || ''} (pre-populated from company record)`;
+      po.appendChild(tgt);
+    }
+    if(!subset.length && side==='Buy'){ const n=document.createElement('div'); n.className='empty-note'; n.textContent='None identified'; po.appendChild(n); }
+    for(const p of subset){
+      po.appendChild(makeCard(
+        p.companyName, p.assocType, p.represents,
+        body => {
+          if(p.notes){ const nb=document.createElement('div'); nb.className='note-block'; nb.textContent=p.notes; body.appendChild(nb); }
+          if(p.profile) companyProfileRows(p.profile, body);
+        },
+        /sponsor/i.test(p.assocType||'')
+      ));
+    }
+  }
+
+  // professionals
+  const pr = $('profsOut'); pr.innerHTML='';
+  const profs = d.professionals || [];
+  if(!profs.length){ pr.innerHTML = '<div class="empty-note">No professionals identified per tracking rules</div>'; }
+  const byFirm = {};
+  profs.forEach(p => { (byFirm[p.firmName] = byFirm[p.firmName]||[]).push(p); });
+  for(const firm in byFirm){
+    const lab = document.createElement('div'); lab.className='side-label'; lab.textContent = firm;
+    pr.appendChild(lab);
+    for(const p of byFirm[firm]){
+      const full = [p.firstName, p.lastName].filter(Boolean).join(' ');
+      pr.appendChild(makeCard(full, p.titleCategory || p.jobTitle || p.trigger || 'Professional', null, body => {
+        body.appendChild(fieldRow('First Name', p.firstName, {required:true}));
+        body.appendChild(fieldRow('Middle Name', p.middleName));
+        body.appendChild(fieldRow('Last Name', p.lastName, {required:true}));
+        body.appendChild(fieldRow('Nick Name', p.nickName));
+        body.appendChild(fieldRow('Suffix', p.suffix));
+        body.appendChild(fieldRow('Degrees', p.degrees));
+        body.appendChild(fieldRow('Company', p.company, {required:true}));
+        body.appendChild(fieldRow('Job Title', p.jobTitle));
+        body.appendChild(fieldRow('Title Category', p.titleCategory));
+        body.appendChild(fieldRow('Website', p.website));
+        body.appendChild(fieldRow('Business Phone', p.businessPhone));
+        body.appendChild(fieldRow('Ext.', p.ext));
+        body.appendChild(fieldRow('Mobile', p.mobile));
+        body.appendChild(fieldRow('Email', p.email));
+        body.appendChild(fieldRow('LinkedIn URL', p.linkedinUrl));
+        body.appendChild(fieldRow('Street', p.street));
+        body.appendChild(fieldRow('Country', p.country, {required:true}));
+        body.appendChild(fieldRow('State', p.state, {required:true}));
+        body.appendChild(fieldRow('City', p.city, {required:true}));
+        body.appendChild(fieldRow('Post Code', p.postCode));
+        body.appendChild(fieldRow('Bio', p.bio));
+      }));
+    }
+  }
+
+  // deal funds
+  const funds = d.dealFunds || [];
+  $('fundsPanel').style.display = funds.length ? '' : 'none';
+  const fo = $('fundsOut'); fo.innerHTML='';
+  funds.forEach(f => fo.appendChild(fieldRow(f.firm, f.fundName || f.note)));
+
+  // financials
+  const fi = $('finOut'); fi.innerHTML='';
+  const fn = d.financials || {};
+  fi.appendChild(fieldRow('Range', fn.range, {required:true}));
+  fi.appendChild(fieldRow('Trans Value', fn.transValue));
+  fi.appendChild(fieldRow('Enter Val', fn.enterVal));
+  fi.appendChild(fieldRow('Target EBITDA', fn.targetEBITDA));
+  fi.appendChild(fieldRow('Target Revenue', fn.targetRevenue));
+  fi.appendChild(fieldRow('EV/EBITDA', fn.evEbitda));
+  fi.appendChild(fieldRow('Financial Terms', fn.financialTerms, {required:true}));
+
+  // description
+  const dsc = $('descOut'); dsc.innerHTML='';
+  dsc.appendChild(fieldRow('Deal Description', d.dealDescription, {required:true}));
+
+  // secondary sources
+  const secs = d.secondarySources || [];
+  $('secPanel').style.display = secs.length ? '' : 'none';
+  const so = $('secOut'); so.innerHTML='';
+  secs.forEach(s => {
+    const div = document.createElement('div'); div.className='sec-source';
+    div.innerHTML = `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title||s.url)}</a>` +
+                    (s.summary?`<div class="ssum">${esc(s.summary)}</div>`:'');
+    so.appendChild(div);
+  });
+
+  // flags
+  const fl = $('flagsOut'); fl.innerHTML='';
+  const flags = d.flags || [];
+  if(!flags.length){ fl.innerHTML='<div class="empty-note">No flags</div>'; }
+  flags.forEach(f => { const x=document.createElement('div'); x.className='flag-item'; x.textContent=f; fl.appendChild(x); });
+
+  $('results').classList.add('show');
+  window.scrollTo({top: $('qualBanner').offsetTop - 20, behavior:'smooth'});
+}
+</script>
+</body>
+</html>
